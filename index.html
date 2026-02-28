@@ -4,29 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Anka AI - Mobile</title>
+    
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <style>
-        /* Blokujemy przesuwanie całej strony i dopasowujemy do ekranu telefonu */
+        /* Stylizacja: Dark Mode Mobile First */
         body, html { 
             margin: 0; padding: 0; 
-            height: 100dvh; /* Dynamiczna wysokość na telefonach */
+            height: 100dvh; 
             width: 100%;
-            overflow: hidden; /* Cała strona nie skacze */
+            overflow: hidden; 
             background: #0f0f12; 
             font-family: 'Segoe UI', Roboto, sans-serif;
         }
 
-        /* Główny kontener - układ pionowy */
         .app-container {
             display: flex;
             flex-direction: column;
             height: 100%;
         }
 
-        /* OKNO CZATU - zajmuje całą wolną przestrzeń i tylko ono się przewija */
+        /* Okno czatu z przewijaniem */
         #chat-window { 
             flex: 1; 
             overflow-y: auto; 
@@ -34,7 +35,8 @@
             display: flex; 
             flex-direction: column; 
             gap: 12px;
-            -webkit-overflow-scrolling: touch; /* Płynne przewijanie na iPhone */
+            -webkit-overflow-scrolling: touch; 
+            padding-bottom: 40px; /* Bufor na dole */
         }
 
         .bubble { 
@@ -44,7 +46,10 @@
             font-size: 16px; 
             line-height: 1.4;
             word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
         }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .user-msg { 
             align-self: flex-end; 
@@ -61,15 +66,16 @@
             border: 1px solid #3a3a45;
         }
 
-        /* PANEL DOLNY - ZAWSZE NA DOLE */
+        /* Panel sterowania */
         .controls { 
-            padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); /* Uwzględnia "kreskę" w nowym iPhone */
+            padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); 
             background: #16161d; 
             border-top: 1px solid #222;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            z-index: 10;
         }
 
         #btn { 
@@ -85,16 +91,22 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            touch-action: manipulation; /* Szybsza reakcja na dotyk */
+            transition: all 0.2s ease;
+            touch-action: manipulation;
         }
 
-        #btn.rec { background: #ff4444; box-shadow: 0 0 20px rgba(255,68,68,0.5); }
+        #btn:active { transform: scale(0.95); }
+        #btn.rec { background: #ff4444; box-shadow: 0 0 25px rgba(255,68,68,0.6); animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); } }
 
         #status { 
-            margin-top: 10px; 
+            margin-top: 12px; 
             font-size: 12px; 
-            color: #666; 
-            letter-spacing: 1px;
+            color: #888; 
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            text-transform: uppercase;
             height: 14px;
         }
     </style>
@@ -103,7 +115,7 @@
 
 <div class="app-container">
     <div id="chat-window">
-        <div class="bubble anka-msg">Cześć Bartek! Jestem gotowa na Twoim telefonie. Powiedz coś.</div>
+        <div class="bubble anka-msg">Cześć Szefie! System zabezpieczony. Jestem gotowa do pracy.</div>
     </div>
 
     <div class="controls">
@@ -113,61 +125,41 @@
 </div>
 
 <script>
+    // --- KONFIGURACJA ---
     const WEBHOOK_URL = "https://hook.eu1.make.com/atppdry0ou4brtqnmncxruqa0nkbz4h1";
+    const API_KEY_STORAGE = 'anka_api_key'; // Nazwa schowka na hasło
+    
+    // --- ELEMENTY UI ---
     const chat = document.getElementById('chat-window');
     const btn = document.getElementById('btn');
     const status = document.getElementById('status');
+    
+    // --- ZMIENNE STANU ---
     let recorder, chunks = [];
+    let userApiKey = localStorage.getItem(API_KEY_STORAGE);
 
+    // --- 1. ZABEZPIECZENIE NA STARCIE ---
+    if (!userApiKey) {
+        // Jeśli brak klucza, zapytaj użytkownika
+        userApiKey = prompt("🔐 Podaj klucz dostępu do Systemu Anka:");
+        if (userApiKey) {
+            localStorage.setItem(API_KEY_STORAGE, userApiKey); // Zapisz na stałe
+            addBubble("Klucz zapisany. Możesz rozmawiać.", "anka");
+        } else {
+            addBubble("⛔ Brak klucza! Odśwież stronę i podaj hasło, aby korzystać.", "anka");
+            btn.disabled = true; // Zablokuj przycisk
+            btn.style.background = "#333";
+        }
+    }
+
+    // --- FUNKCJE POMOCNICZE ---
     function addBubble(text, sender) {
         const b = document.createElement('div');
         b.className = `bubble ${sender}-msg`;
         b.innerText = text;
         chat.appendChild(b);
-        // Automatyczne przewijanie do najnowszego tekstu
         chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
     }
 
+    // --- LOGIKA NAGRYWANIA ---
     btn.onclick = async () => {
-        if (!recorder || recorder.state === "inactive") {
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-                recorder = new MediaRecorder(s);
-                recorder.ondataavailable = e => chunks.push(e.data);
-                recorder.onstop = async () => {
-                    const blob = new Blob(chunks, { type: recorder.mimeType });
-                    const fd = new FormData();
-                    fd.append('file', blob, 'audio.webm');
-
-                    status.innerText = "MYŚLĘ...";
-                    try {
-                        const res = await fetch(WEBHOOK_URL, { method: 'POST', body: fd });
-                        const data = await res.json();
-                        
-                        if (data.user_text) addBubble(data.user_text, 'user');
-                        if (data.assistant_text) addBubble(data.assistant_text, 'anka');
-                        if (data.audio) {
-                            const audio = new Audio("data:audio/mpeg;base64," + data.audio);
-                            audio.play();
-                        }
-                    } catch (e) {
-                        addBubble("Błąd: " + e.message, "anka");
-                    }
-                    chunks = [];
-                    status.innerText = "GOTOWA";
-                };
-                recorder.start();
-                btn.classList.add('rec');
-                status.innerText = "SŁUCHAM...";
-            } catch (e) { alert("Błąd mikrofonu: " + e.message); }
-        } else {
-            recorder.stop();
-            btn.classList.remove('rec');
-            status.innerText = "PRZETWARZAM...";
-        }
-    };
-</script>
-
-</body>
-</html>
-
