@@ -126,33 +126,18 @@
 
 <script>
     // --- KONFIGURACJA ---
-    const WEBHOOK_URL = "https://hook.eu1.make.com/atppdry0ou4brtqnmncxruqa0nkbz4h1";
-    const API_KEY_STORAGE = 'anka_api_key'; // Nazwa schowka na hasło
+    const WEBHOOK_URL = "https://hook.eu1.make.com/atppdry0ou4brtqnmncxruqa0nkbz4h1"; 
+    const API_KEY_STORAGE = 'anka_api_key';
     
-    // --- ELEMENTY UI ---
+    // --- UI ---
     const chat = document.getElementById('chat-window');
     const btn = document.getElementById('btn');
     const status = document.getElementById('status');
     
-    // --- ZMIENNE STANU ---
+    // --- ZMIENNE ---
     let recorder, chunks = [];
-    let userApiKey = localStorage.getItem(API_KEY_STORAGE);
 
-    // --- 1. ZABEZPIECZENIE NA STARCIE ---
-    if (!userApiKey) {
-        // Jeśli brak klucza, zapytaj użytkownika
-        userApiKey = prompt("🔐 Podaj klucz dostępu do Systemu Anka:");
-        if (userApiKey) {
-            localStorage.setItem(API_KEY_STORAGE, userApiKey); // Zapisz na stałe
-            addBubble("Klucz zapisany. Możesz rozmawiać.", "anka");
-        } else {
-            addBubble("⛔ Brak klucza! Odśwież stronę i podaj hasło, aby korzystać.", "anka");
-            btn.disabled = true; // Zablokuj przycisk
-            btn.style.background = "#333";
-        }
-    }
-
-    // --- FUNKCJE POMOCNICZE ---
+    // --- FUNKCJE ---
     function addBubble(text, sender) {
         const b = document.createElement('div');
         b.className = `bubble ${sender}-msg`;
@@ -161,5 +146,91 @@
         chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
     }
 
-    // --- LOGIKA NAGRYWANIA ---
+    function getApiKey() {
+        let key = localStorage.getItem(API_KEY_STORAGE);
+        if (!key) {
+            key = prompt("🔐 Podaj hasło do systemu Anka:");
+            if (key) {
+                localStorage.setItem(API_KEY_STORAGE, key);
+                addBubble("Klucz zapisany. Możesz mówić.", "anka");
+            }
+        }
+        return key;
+    }
+
+    // --- START APLIKACJI ---
+    // Próbujemy pobrać klucz na starcie, ale nie blokujemy przycisku jak się nie uda
+    getApiKey();
+
+    // --- KLIKNIĘCIE MIKROFONU ---
     btn.onclick = async () => {
+        // 1. Sprawdzenie klucza w momencie kliknięcia
+        const currentKey = getApiKey();
+        
+        if (!currentKey) {
+            alert("Musisz podać hasło, aby używać Anki!");
+            return; // Przerywamy, jeśli dalej brak hasła
+        }
+
+        // 2. Obsługa nagrywania
+        if (!recorder || recorder.state === "inactive") {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recorder = new MediaRecorder(stream);
+                recorder.ondataavailable = e => chunks.push(e.data);
+                
+                recorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: recorder.mimeType });
+                    const fd = new FormData();
+                    fd.append('file', blob, 'audio.webm');
+                    fd.append('x-api-key', currentKey); // <--- Tutaj idzie klucz
+
+                    status.innerText = "MYŚLĘ...";
+                    status.style.color = "#4e44ff";
+
+                    try {
+                        const res = await fetch(WEBHOOK_URL, { method: 'POST', body: fd });
+                        
+                        // Obsługa błędu 403 (Złe hasło)
+                        if (res.status === 401 || res.status === 403) {
+                            localStorage.removeItem(API_KEY_STORAGE); // Usuń złe hasło
+                            addBubble("⛔ Błędne hasło! Spróbuj ponownie.", "anka");
+                            throw new Error("Odmowa dostępu");
+                        }
+
+                        const data = await res.json();
+                        
+                        if (data.user_text) addBubble(data.user_text, 'user');
+                        if (data.assistant_text) addBubble(data.assistant_text, 'anka');
+                        if (data.audio) {
+                            const audio = new Audio("data:audio/mpeg;base64," + data.audio);
+                            audio.play();
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        // Nie wyświetlamy błędu userowi, jeśli to tylko odmowa dostępu
+                        if(e.message !== "Odmowa dostępu") {
+                             addBubble("Problem z połączeniem.", "anka");
+                        }
+                    }
+                    chunks = [];
+                    status.innerText = "GOTOWA";
+                    status.style.color = "#888";
+                };
+
+                recorder.start();
+                btn.classList.add('rec');
+                status.innerText = "SŁUCHAM...";
+                status.style.color = "#ff4444";
+
+            } catch (e) { alert("Błąd mikrofonu: " + e.message); }
+        } else {
+            recorder.stop();
+            btn.classList.remove('rec');
+            status.innerText = "PRZETWARZAM...";
+            status.style.color = "#fff";
+        }
+    };
+</script>
+</body>
+</html>
