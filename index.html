@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Anka AI - Mobile</title>
-    
+    <title>Anka AI</title>
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <style>
-        /* Stylizacja: Dark Mode Mobile First */
         body, html { 
             margin: 0; padding: 0; 
             height: 100dvh; 
@@ -20,14 +17,7 @@
             background: #0f0f12; 
             font-family: 'Segoe UI', Roboto, sans-serif;
         }
-
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        /* Okno czatu z przewijaniem */
+        .app-container { display: flex; flex-direction: column; height: 100%; }
         #chat-window { 
             flex: 1; 
             overflow-y: auto; 
@@ -36,88 +26,30 @@
             flex-direction: column; 
             gap: 12px;
             -webkit-overflow-scrolling: touch; 
-            padding-bottom: 40px; /* Bufor na dole */
         }
-
         .bubble { 
-            max-width: 85%; 
-            padding: 12px 16px; 
-            border-radius: 20px; 
-            font-size: 16px; 
-            line-height: 1.4;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s ease;
+            max-width: 85%; padding: 12px 16px; border-radius: 20px; font-size: 16px; line-height: 1.4; word-wrap: break-word;
         }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .user-msg { 
-            align-self: flex-end; 
-            background: #4e44ff; 
-            color: white; 
-            border-bottom-right-radius: 4px; 
-        }
-
-        .anka-msg { 
-            align-self: flex-start; 
-            background: #2a2a35; 
-            color: #eee; 
-            border-bottom-left-radius: 4px; 
-            border: 1px solid #3a3a45;
-        }
-
-        /* Panel sterowania */
+        .user-msg { align-self: flex-end; background: #4e44ff; color: white; border-bottom-right-radius: 4px; }
+        .anka-msg { align-self: flex-start; background: #2a2a35; color: #eee; border-bottom-left-radius: 4px; border: 1px solid #3a3a45; }
         .controls { 
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); 
-            background: #16161d; 
-            border-top: 1px solid #222;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
+            background: #16161d; border-top: 1px solid #222; display: flex; flex-direction: column; align-items: center;
         }
-
         #btn { 
-            width: 75px; 
-            height: 75px; 
-            border-radius: 50%; 
-            border: none; 
-            background: #4e44ff; 
-            color: white; 
-            font-size: 32px; 
-            cursor: pointer; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            touch-action: manipulation;
+            width: 75px; height: 75px; border-radius: 50%; border: none; background: #4e44ff; color: white; font-size: 32px; 
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
         }
-
-        #btn:active { transform: scale(0.95); }
-        #btn.rec { background: #ff4444; box-shadow: 0 0 25px rgba(255,68,68,0.6); animation: pulse 1.5s infinite; }
-        
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); } }
-
-        #status { 
-            margin-top: 12px; 
-            font-size: 12px; 
-            color: #888; 
-            letter-spacing: 1.5px;
-            font-weight: 600;
-            text-transform: uppercase;
-            height: 14px;
-        }
+        #btn.rec { background: #ff4444; box-shadow: 0 0 20px rgba(255,68,68,0.5); }
+        #status { margin-top: 10px; font-size: 12px; color: #666; letter-spacing: 1px; height: 14px; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="chat-window">
-        <div class="bubble anka-msg">Cześć Szefie! System zabezpieczony. Jestem gotowa do pracy.</div>
+        <div class="bubble anka-msg">Cześć! Jestem Anka. W czym mogę Ci pomóc?</div>
     </div>
-
     <div class="controls">
         <button id="btn">🎤</button>
         <div id="status">GOTOWA</div>
@@ -125,19 +57,12 @@
 </div>
 
 <script>
-    // --- KONFIGURACJA ---
-    const WEBHOOK_URL = "https://hook.eu1.make.com/atppdry0ou4brtqnmncxruqa0nkbz4h1"; 
-    const API_KEY_STORAGE = 'anka_api_key';
-    
-    // --- UI ---
+    const WEBHOOK_URL = "https://hook.eu1.make.com/atppdry0ou4brtqnmncxruqa0nkbz4h1";
     const chat = document.getElementById('chat-window');
     const btn = document.getElementById('btn');
     const status = document.getElementById('status');
-    
-    // --- ZMIENNE ---
     let recorder, chunks = [];
 
-    // --- FUNKCJE ---
     function addBubble(text, sender) {
         const b = document.createElement('div');
         b.className = `bubble ${sender}-msg`;
@@ -146,89 +71,39 @@
         chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
     }
 
-    function getApiKey() {
-        let key = localStorage.getItem(API_KEY_STORAGE);
-        if (!key) {
-            key = prompt("🔐 Podaj hasło do systemu Anka:");
-            if (key) {
-                localStorage.setItem(API_KEY_STORAGE, key);
-                addBubble("Klucz zapisany. Możesz mówić.", "anka");
-            }
-        }
-        return key;
-    }
-
-    // --- START APLIKACJI ---
-    // Próbujemy pobrać klucz na starcie, ale nie blokujemy przycisku jak się nie uda
-    getApiKey();
-
-    // --- KLIKNIĘCIE MIKROFONU ---
     btn.onclick = async () => {
-        // 1. Sprawdzenie klucza w momencie kliknięcia
-        const currentKey = getApiKey();
-        
-        if (!currentKey) {
-            alert("Musisz podać hasło, aby używać Anki!");
-            return; // Przerywamy, jeśli dalej brak hasła
-        }
-
-        // 2. Obsługa nagrywania
         if (!recorder || recorder.state === "inactive") {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                recorder = new MediaRecorder(stream);
+                const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recorder = new MediaRecorder(s);
                 recorder.ondataavailable = e => chunks.push(e.data);
-                
                 recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: recorder.mimeType });
                     const fd = new FormData();
                     fd.append('file', blob, 'audio.webm');
-                    fd.append('x-api-key', currentKey); // <--- Tutaj idzie klucz
 
                     status.innerText = "MYŚLĘ...";
-                    status.style.color = "#4e44ff";
-
                     try {
                         const res = await fetch(WEBHOOK_URL, { method: 'POST', body: fd });
-                        
-                        // Obsługa błędu 403 (Złe hasło)
-                        if (res.status === 401 || res.status === 403) {
-                            localStorage.removeItem(API_KEY_STORAGE); // Usuń złe hasło
-                            addBubble("⛔ Błędne hasło! Spróbuj ponownie.", "anka");
-                            throw new Error("Odmowa dostępu");
-                        }
-
                         const data = await res.json();
-                        
                         if (data.user_text) addBubble(data.user_text, 'user');
                         if (data.assistant_text) addBubble(data.assistant_text, 'anka');
                         if (data.audio) {
                             const audio = new Audio("data:audio/mpeg;base64," + data.audio);
                             audio.play();
                         }
-                    } catch (e) {
-                        console.error(e);
-                        // Nie wyświetlamy błędu userowi, jeśli to tylko odmowa dostępu
-                        if(e.message !== "Odmowa dostępu") {
-                             addBubble("Problem z połączeniem.", "anka");
-                        }
-                    }
+                    } catch (e) { addBubble("Błąd połączenia.", "anka"); }
                     chunks = [];
                     status.innerText = "GOTOWA";
-                    status.style.color = "#888";
                 };
-
                 recorder.start();
                 btn.classList.add('rec');
                 status.innerText = "SŁUCHAM...";
-                status.style.color = "#ff4444";
-
             } catch (e) { alert("Błąd mikrofonu: " + e.message); }
         } else {
             recorder.stop();
             btn.classList.remove('rec');
             status.innerText = "PRZETWARZAM...";
-            status.style.color = "#fff";
         }
     };
 </script>
